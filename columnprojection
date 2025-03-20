@@ -1,0 +1,85 @@
+public BsonDocument CreateColumnProjection(string[] displayColumns)
+{
+    // Create projection that uses direct field mapping instead of inclusion/exclusion
+    var projectionDoc = new BsonDocument();
+
+    // First set all fields to 0 to exclude them by default (excluding _id)
+    projectionDoc.Add("_id", 0);
+
+    // Track fields that have been added to avoid duplicates
+    HashSet<string> addedFields = new HashSet<string>();
+    bool needsDurationCalculation = false;
+
+    // First pass: identify special fields and standard fields
+    foreach (var displayColumn in displayColumns)
+    {
+        // Check for Duration field which requires special handling
+        if (displayColumn == "Duration")
+        {
+            needsDurationCalculation = true;
+            continue;
+        }
+
+        if (_fieldMappings.TryGetValue(displayColumn, out string mappedField))
+        {
+            // Skip special calculated fields in this pass
+            if (mappedField.StartsWith("_calculated_"))
+                continue;
+
+            // Handle standard fields as before
+            if (addedFields.Contains(displayColumn))
+                continue;
+
+            addedFields.Add(displayColumn);
+
+            if (mappedField.Contains('.'))
+            {
+                projectionDoc.Add(displayColumn, new BsonDocument("$ifNull",
+                    new BsonArray { $"${mappedField}", BsonNull.Value }));
+                Console.WriteLine($"Creating direct mapping for nested field: {mappedField} -> {displayColumn}");
+            }
+            else
+            {
+                projectionDoc.Add(displayColumn, new BsonDocument("$ifNull",
+                    new BsonArray { $"${mappedField}", BsonNull.Value }));
+                Console.WriteLine($"Creating direct mapping for field: {mappedField} -> {displayColumn}");
+            }
+        }
+        else
+        {
+            // No mapping found, use the column name as is
+            projectionDoc.Add(displayColumn, new BsonDocument("$ifNull",
+                new BsonArray { $"${displayColumn}", BsonNull.Value }));
+            Console.WriteLine($"Using direct column name: {displayColumn}");
+        }
+    }
+
+    // Handle Duration calculation if needed
+    if (needsDurationCalculation)
+    {
+        // Add calculated field for Duration using MongoDB's calculation capabilities
+        // This assumes StartTime and EndTime are DateTime fields in the database
+        projectionDoc.Add("Duration", new BsonDocument("$cond", new BsonArray
+        {
+            new BsonDocument("$and", new BsonArray
+            {
+                new BsonDocument("$ne", new BsonArray { "$StartTime", BsonNull.Value }),
+                new BsonDocument("$ne", new BsonArray { "$EndTime", BsonNull.Value })
+            }),
+            // If StartTime and EndTime exist, calculate the difference in milliseconds and format
+            new BsonDocument("$toString", new BsonDocument("$divide", new BsonArray
+            {
+                new BsonDocument("$subtract", new BsonArray { "$EndTime", "$StartTime" }),
+                60000 // Convert to minutes for readable format
+            })),
+            // Else return empty string
+            ""
+        }));
+        
+        Console.WriteLine("Added calculated Duration field to projection");
+    }
+
+    // Debug log the final projection
+    Console.WriteLine($"Final projection: {projectionDoc.ToJson()}");
+    return projectionDoc;
+}
