@@ -1,0 +1,100 @@
+trigger:
+  paths:
+    include:
+      - 'xml-folder/*.xml'  # Only trigger on XML files in specified folder
+
+pool:
+  name: 'Self-hosted'  # Use your self-hosted agent pool
+
+steps:
+- checkout: self
+  fetchDepth: 1
+  clean: true
+  persistCredentials: true
+
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.x'
+    addToPath: true
+  displayName: 'Set up Python'
+
+- task: PythonScript@0
+  inputs:
+    scriptSource: 'inline'
+    script: |
+      import os
+      import json
+      import xml.etree.ElementTree as ET
+      from pathlib import Path
+      
+      # Set folder paths
+      xml_folder = 'xml-folder'
+      json_folder = 'json-folder'
+      
+      # Create json folder if it doesn't exist
+      os.makedirs(json_folder, exist_ok=True)
+      
+      # Get all XML files
+      xml_files = list(Path(xml_folder).glob('*.xml'))
+      print(f"Found {len(xml_files)} XML files to convert")
+      
+      for xml_file in xml_files:
+          print(f"Converting {xml_file.name}")
+          
+          try:
+              # Parse XML
+              tree = ET.parse(xml_file)
+              root = tree.getroot()
+              
+              # Convert XML to dict (simplified conversion)
+              def xml_to_dict(element):
+                  result = {}
+                  for child in element:
+                      if len(child) > 0:
+                          child_dict = xml_to_dict(child)
+                          if child.tag in result:
+                              if type(result[child.tag]) is list:
+                                  result[child.tag].append(child_dict)
+                              else:
+                                  result[child.tag] = [result[child.tag], child_dict]
+                          else:
+                              result[child.tag] = child_dict
+                      else:
+                          if child.tag in result:
+                              if type(result[child.tag]) is list:
+                                  result[child.tag].append(child.text or "")
+                              else:
+                                  result[child.tag] = [result[child.tag], child.text or ""]
+                          else:
+                              result[child.tag] = child.text or ""
+                  
+                  # Add attributes if any
+                  for attr_name, attr_value in element.attrib.items():
+                      result[f"@{attr_name}"] = attr_value
+                      
+                  return result
+              
+              # Convert XML to dictionary
+              xml_dict = {root.tag: xml_to_dict(root)}
+              
+              # Create JSON filename with same base name
+              json_filename = xml_file.stem + '.json'
+              json_path = os.path.join(json_folder, json_filename)
+              
+              # Write JSON file
+              with open(json_path, 'w') as json_file:
+                  json.dump(xml_dict, json_file, indent=2)
+                  
+              print(f"Created {json_path}")
+          
+          except Exception as e:
+              print(f"Error converting {xml_file.name}: {str(e)}")
+  displayName: 'Convert XML to JSON'
+
+- script: |
+    git config --global user.email "pipeline@example.com"
+    git config --global user.name "Azure Pipeline"
+    git add json-folder/*.json
+    git diff --staged --quiet || git commit -m "Convert XML to JSON [skip ci]"
+    git push origin HEAD:$(Build.SourceBranchName)
+  displayName: 'Commit JSON files'
