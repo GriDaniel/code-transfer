@@ -12,12 +12,6 @@ steps:
   clean: true
   persistCredentials: true
 
-- task: UsePythonVersion@0
-  inputs:
-    versionSpec: '3.x'
-    addToPath: true
-  displayName: 'Set up Python'
-
 - task: PythonScript@0
   inputs:
     scriptSource: 'inline'
