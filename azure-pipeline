@@ -85,10 +85,12 @@ steps:
               print(f"Error converting {xml_file.name}: {str(e)}")
   displayName: 'Convert XML to JSON'
 
-- script: |
-    git config --global user.email "pipeline@example.com"
-    git config --global user.name "Azure Pipeline"
-    git add json-folder/*.json
-    git diff --staged --quiet || git commit -m "Convert XML to JSON [skip ci]"
-    git push origin HEAD:$(Build.SourceBranchName)
+- task: CmdLine@2
+  inputs:
+    script: |
+      git config --global user.email "pipeline@example.com"
+      git config --global user.name "Azure Pipeline"
+      git add json-folder/*.json
+      git diff --staged --quiet || git commit -m "Convert XML to JSON [skip ci]"
+      git push origin HEAD:$(Build.SourceBranchName)
   displayName: 'Commit JSON files'
