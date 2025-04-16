@@ -1,0 +1,26 @@
+import xml.etree.ElementTree as ET
+
+def xml_to_dict(element):
+    """Convert XML element to dictionary recursively"""
+    result = {}
+    if element.attrib:
+        result["@attributes"] = element.attrib
+    if element.text and element.text.strip():
+        result["#text"] = element.text.strip()
+    for child in element:
+        child_data = xml_to_dict(child)
+        if child.tag in result:
+            if not isinstance(result[child.tag], list):
+                result[child.tag] = [result[child.tag]]
+            result[child.tag].append(child_data)
+        else:
+            result[child.tag] = child_data
+    return result
+
+def xml_to_json(xml_str):
+    """Convert XML string to JSON-compatible dictionary"""
+    try:
+        root = ET.fromstring(xml_str)
+        return xml_to_dict(root)
+    except ET.ParseError:
+        return None
