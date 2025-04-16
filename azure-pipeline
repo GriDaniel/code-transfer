@@ -1,7 +1,7 @@
 trigger:
   paths:
     include:
-      - testData/**
+      - samreglib/testData/**
 
 pool:
   name: Self-hosted
@@ -9,42 +9,28 @@ pool:
 steps:
 - script: |
     echo Current directory: %CD%
-    git --version || (echo Git not found && exit /b 1)
-    echo Checking script path:
-    if exist utils\processXML\processXML.py (
-      echo Found utils\processXML\processXML.py
-    ) else (
-      echo ERROR: Script utils\processXML\processXML.py not found
-      dir /s processXML.py
+    if not exist samreglib\utils\processXML\processXML.py (
+      echo ERROR: samreglib\utils\processXML\processXML.py not found
       exit /b 1
     )
-    echo Checking XML files:
-    dir samreglib\testData\*\*.xml /s /p || echo No XML files found
     for /f "tokens=*" %%f in ('git diff --name-only --diff-filter=A HEAD^ HEAD 2^>nul') do (
-      echo Processing %%f
-      if "%%f"=="samreglib\testData\*\*.xml" (
-        if exist "%%f" (
-          echo File %%f exists
-          python3 utils\processXML\processXML.py "%%f" || echo Failed to process %%f
-        ) else (
-          echo File %%f not found
+      if exist "%%f" (
+        if "%%f"=="samreglib\testData\*.xml" (
+          echo Processing %%f
+          python3 samreglib\utils\processXML\processXML.py "%%f"
         )
       )
     )
-    echo JSON files:
-    dir samreglib\testData\*\*.json /s /p || echo No JSON files found
   displayName: 'Process XML files'
   workingDirectory: $(System.DefaultWorkingDirectory)
 
 - script: |
     echo Current directory: %CD%
-    echo Pending changes:
-    git status --porcelain
     git status --porcelain | findstr . >nul || (echo No changes to commit && exit /b 0)
     git config --global user.email "pipeline@example.com"
     git config --global user.name "Pipeline"
     git add .
-    git commit -m "Converted XML to JSON" || (echo Commit failed && exit /b 1)
-    git push origin HEAD:$(git rev-parse --abbrev-ref HEAD) || (echo Push failed && exit /b 1)
+    git commit -m "Converted XML to JSON"
+    git push origin HEAD:$(git rev-parse --abbrev-ref HEAD)
   displayName: 'Commit and push JSON'
   workingDirectory: $(System.DefaultWorkingDirectory)
