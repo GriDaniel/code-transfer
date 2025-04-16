@@ -1,36 +1,67 @@
-\trigger:
+trigger:
   paths:
     include:
       - testData/**
 
 pool:
-  vmImage: 'ubuntu-latest'
+  name: Self-gosted
 
 steps:
 - script: |
-    # Install necessary Python packages (if needed)
-    pip install -r requirements.txt
+    # Explicitly use bash to ensure correct shell
+    /bin/bash -c "
+      # Check if Python is available
+      python3 --version || { echo 'Python3 not found'; exit 1; }
+      
+      # Install necessary Python packages (if needed)
+      pip3 install -r requirements.txt || echo 'Failed to install requirements, continuing'
+    "
   displayName: 'Install dependencies'
 
 - script: |
-    # Get list of all added files
-    added_files=$(git diff --name-only --diff-filter=A HEAD^ HEAD)
-    for file in $added_files; do
-      # Check if the file is an XML in MinerLib/testData/<something>/
-      if [[ $file == MinerLib/testData/*/*.xml ]]; then
-        echo "Processing $file"
-        python utils/processXML/process_xml.py "$file"
+    # Explicitly use bash to ensure correct shell
+    /bin/bash -c "
+      # Check if git is available
+      git --version || { echo 'Git not found'; exit 1; }
+      
+      # Get list of all added files
+      added_files=\$(git diff --name-only --diff-filter=A HEAD^ HEAD 2>/dev/null) || {
+        echo 'Error running git diff, possibly no previous commit'
+        exit 0
+      }
+      
+      # Debug: Print added_files
+      echo 'Added files:'
+      echo \"\$added_files\"
+      
+      # Check if any files were added
+      if [ -z \"\$added_files\" ]; then
+        echo 'No files added, skipping processing'
+        exit 0
       fi
-    done
+      
+      # Process each added file
+      for file in \$added_files; do
+        if [[ \$file == MinerLib/testData/*/*.xml ]]; then
+          echo \"Processing \$file\"
+          python3 utils/processXML/process_xml.py \"\$file\" || echo \"Failed to process \$file\"
+        fi
+      done
+    "
   displayName: 'Process added XML files'
 
 - script: |
-    # Check if there are any changes to commit
-    if [ -n "$(git status --porcelain)" ]; then
-      git config --global user.email "pipeline@example.com"
-      git config --global user.name "Pipeline"
-      git add .
-      git commit -m "Converted XML to JSON for testData"
-      git push origin HEAD:$(git rev-parse --abbrev-ref HEAD)
-    fi
+    # Explicitly use bash to ensure correct shell
+    /bin/bash -c "
+      # Check for changes to commit
+      if [ -n \"\$(git status --porcelain)\" ]; then
+        git config --global user.email 'pipeline@example.com'
+        git config --global user.name 'Pipeline'
+        git add .
+        git commit -m 'Converted XML to JSON for testData' || echo 'Failed to commit changes'
+        git push origin HEAD:\$(git rev-parse --abbrev-ref HEAD) || echo 'Failed to push changes'
+      else
+        echo 'No changes to commit'
+      fi
+    "
   displayName: 'Commit and push JSON files'
