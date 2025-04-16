@@ -7,37 +7,44 @@ pool:
   name: Self-hosted
 
 steps:
-- bash: |
-    python3 --version || { echo "Python3 not found"; exit 1; }
-    pip3 install -r requirements.txt || echo "No requirements.txt, continuing"
-  displayName: 'Install dependencies'
-  workingDirectory: $(System.DefaultWorkingDirectory)
-
-- bash: |
-    echo "Current directory: $(pwd)"
-    git --version || { echo "Git not found"; exit 1; }
-    added_files=$(git diff --name-only --diff-filter=A HEAD^ HEAD 2>/dev/null) || exit 0
-    [ -z "$added_files" ] && { echo "No files added"; exit 0; }
-    for file in $added_files; do
-      if [[ $file == samreglib/testData/*/*.xml ]]; then
-        echo "Processing $file"
-        [ -f "$file" ] || { echo "File $file not found"; continue; }
-        python3 utils/processXML/processXML.py "$file" || echo "Failed to process $file"
-      fi
-    done
-    echo "JSON files:"
-    ls samreglib/testData/*/*.json 2>/dev/null || echo "No JSON files"
+- script: |
+    echo Current directory: %CD%
+    git --version || (echo Git not found && exit /b 1)
+    echo Checking script path:
+    if exist utils\processXML\processXML.py (
+      echo Found utils\processXML\processXML.py
+    ) else (
+      echo ERROR: Script utils\processXML\processXML.py not found
+      dir /s processXML.py
+      exit /b 1
+    )
+    echo Checking XML files:
+    dir samreglib\testData\*\*.xml /s /p || echo No XML files found
+    for /f "tokens=*" %%f in ('git diff --name-only --diff-filter=A HEAD^ HEAD 2^>nul') do (
+      echo Processing %%f
+      if "%%f"=="samreglib\testData\*\*.xml" (
+        if exist "%%f" (
+          echo File %%f exists
+          python3 utils\processXML\processXML.py "%%f" || echo Failed to process %%f
+        ) else (
+          echo File %%f not found
+        )
+      )
+    )
+    echo JSON files:
+    dir samreglib\testData\*\*.json /s /p || echo No JSON files found
   displayName: 'Process XML files'
   workingDirectory: $(System.DefaultWorkingDirectory)
 
-- bash: |
-    echo "Pending changes:"
-    git status --porcelain || exit 1
-    git status --porcelain | grep -q . || { echo "No changes to commit"; exit 0; }
+- script: |
+    echo Current directory: %CD%
+    echo Pending changes:
+    git status --porcelain
+    git status --porcelain | findstr . >nul || (echo No changes to commit && exit /b 0)
     git config --global user.email "pipeline@example.com"
     git config --global user.name "Pipeline"
     git add .
-    git commit -m "Converted XML to JSON" || exit 1
-    git push origin HEAD:$(git rev-parse --abbrev-ref HEAD) || exit 1
+    git commit -m "Converted XML to JSON" || (echo Commit failed && exit /b 1)
+    git push origin HEAD:$(git rev-parse --abbrev-ref HEAD) || (echo Push failed && exit /b 1)
   displayName: 'Commit and push JSON'
   workingDirectory: $(System.DefaultWorkingDirectory)
