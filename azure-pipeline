@@ -1,26 +1,36 @@
-import xml.etree.ElementTree as ET
+\trigger:
+  paths:
+    include:
+      - testData/**
 
-def xml_to_dict(element):
-    """Convert XML element to dictionary recursively"""
-    result = {}
-    if element.attrib:
-        result["@attributes"] = element.attrib
-    if element.text and element.text.strip():
-        result["#text"] = element.text.strip()
-    for child in element:
-        child_data = xml_to_dict(child)
-        if child.tag in result:
-            if not isinstance(result[child.tag], list):
-                result[child.tag] = [result[child.tag]]
-            result[child.tag].append(child_data)
-        else:
-            result[child.tag] = child_data
-    return result
+pool:
+  vmImage: 'ubuntu-latest'
 
-def xml_to_json(xml_str):
-    """Convert XML string to JSON-compatible dictionary"""
-    try:
-        root = ET.fromstring(xml_str)
-        return xml_to_dict(root)
-    except ET.ParseError:
-        return None
+steps:
+- script: |
+    # Install necessary Python packages (if needed)
+    pip install -r requirements.txt
+  displayName: 'Install dependencies'
+
+- script: |
+    # Get list of all added files
+    added_files=$(git diff --name-only --diff-filter=A HEAD^ HEAD)
+    for file in $added_files; do
+      # Check if the file is an XML in MinerLib/testData/<something>/
+      if [[ $file == MinerLib/testData/*/*.xml ]]; then
+        echo "Processing $file"
+        python utils/processXML/process_xml.py "$file"
+      fi
+    done
+  displayName: 'Process added XML files'
+
+- script: |
+    # Check if there are any changes to commit
+    if [ -n "$(git status --porcelain)" ]; then
+      git config --global user.email "pipeline@example.com"
+      git config --global user.name "Pipeline"
+      git add .
+      git commit -m "Converted XML to JSON for testData"
+      git push origin HEAD:$(git rev-parse --abbrev-ref HEAD)
+    fi
+  displayName: 'Commit and push JSON files'
