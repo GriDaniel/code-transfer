@@ -4,64 +4,40 @@ trigger:
       - testData/**
 
 pool:
-  name: Self-gosted
+  name: Self-hosted
 
 steps:
-- script: |
-    # Explicitly use bash to ensure correct shell
-    /bin/bash -c "
-      # Check if Python is available
-      python3 --version || { echo 'Python3 not found'; exit 1; }
-      
-      # Install necessary Python packages (if needed)
-      pip3 install -r requirements.txt || echo 'Failed to install requirements, continuing'
-    "
+- bash: |
+    python3 --version || { echo "Python3 not found"; exit 1; }
+    pip3 install -r requirements.txt || echo "No requirements.txt, continuing"
   displayName: 'Install dependencies'
+  workingDirectory: $(System.DefaultWorkingDirectory)
 
-- script: |
-    # Explicitly use bash to ensure correct shell
-    /bin/bash -c "
-      # Check if git is available
-      git --version || { echo 'Git not found'; exit 1; }
-      
-      # Get list of all added files
-      added_files=\$(git diff --name-only --diff-filter=A HEAD^ HEAD 2>/dev/null) || {
-        echo 'Error running git diff, possibly no previous commit'
-        exit 0
-      }
-      
-      # Debug: Print added_files
-      echo 'Added files:'
-      echo \"\$added_files\"
-      
-      # Check if any files were added
-      if [ -z \"\$added_files\" ]; then
-        echo 'No files added, skipping processing'
-        exit 0
+- bash: |
+    echo "Current directory: $(pwd)"
+    git --version || { echo "Git not found"; exit 1; }
+    added_files=$(git diff --name-only --diff-filter=A HEAD^ HEAD 2>/dev/null) || exit 0
+    [ -z "$added_files" ] && { echo "No files added"; exit 0; }
+    for file in $added_files; do
+      if [[ $file == samreglib/testData/*/*.xml ]]; then
+        echo "Processing $file"
+        [ -f "$file" ] || { echo "File $file not found"; continue; }
+        python3 utils/processXML/processXML.py "$file" || echo "Failed to process $file"
       fi
-      
-      # Process each added file
-      for file in \$added_files; do
-        if [[ \$file == MinerLib/testData/*/*.xml ]]; then
-          echo \"Processing \$file\"
-          python3 utils/processXML/process_xml.py \"\$file\" || echo \"Failed to process \$file\"
-        fi
-      done
-    "
-  displayName: 'Process added XML files'
+    done
+    echo "JSON files:"
+    ls samreglib/testData/*/*.json 2>/dev/null || echo "No JSON files"
+  displayName: 'Process XML files'
+  workingDirectory: $(System.DefaultWorkingDirectory)
 
-- script: |
-    # Explicitly use bash to ensure correct shell
-    /bin/bash -c "
-      # Check for changes to commit
-      if [ -n \"\$(git status --porcelain)\" ]; then
-        git config --global user.email 'pipeline@example.com'
-        git config --global user.name 'Pipeline'
-        git add .
-        git commit -m 'Converted XML to JSON for testData' || echo 'Failed to commit changes'
-        git push origin HEAD:\$(git rev-parse --abbrev-ref HEAD) || echo 'Failed to push changes'
-      else
-        echo 'No changes to commit'
-      fi
-    "
-  displayName: 'Commit and push JSON files'
+- bash: |
+    echo "Pending changes:"
+    git status --porcelain || exit 1
+    git status --porcelain | grep -q . || { echo "No changes to commit"; exit 0; }
+    git config --global user.email "pipeline@example.com"
+    git config --global user.name "Pipeline"
+    git add .
+    git commit -m "Converted XML to JSON" || exit 1
+    git push origin HEAD:$(git rev-parse --abbrev-ref HEAD) || exit 1
+  displayName: 'Commit and push JSON'
+  workingDirectory: $(System.DefaultWorkingDirectory)
