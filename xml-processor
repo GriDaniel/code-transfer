@@ -1,0 +1,57 @@
+import xml.etree.ElementTree as ET
+import xmltodict
+import json
+import os
+
+def get_specifier_from_path(file_path):
+    parts = file_path.split(os.sep)
+    specifier = parts[2]  # e.g., '_line_squareTube'
+    if specifier.startswith('_line_'):
+        return specifier.replace('_line_', '', 1)
+    return specifier
+
+def parse_xml(file_path):
+    with open(file_path, 'r') as f:
+        xml_string = f.read()
+    return ET.fromstring(xml_string)
+
+def extract_nested_xml(root):
+    data_element = root.find('.//Data')
+    if data_element is None:
+        raise ValueError("No <Data> element found")
+    nested_xml_string = data_element.text
+    return ET.fromstring(nested_xml_string)
+
+def get_methode_name(nested_root):
+    methode_element = nested_root.find('.//METHODE')
+    if methode_element is None:
+        raise ValueError("No <METHODE> element found")
+    name = methode_element.get('Name')
+    if name is None:
+        raise ValueError("No 'Name' attribute in <METHODE>")
+    return name
+
+def check_specifier_match(specifier, methode_name):
+    return specifier == methode_name
+
+def convert_to_json(main_root, nested_root):
+    main_dict = xmltodict.parse(ET.tostring(main_root))
+    nested_dict = xmltodict.parse(ET.tostring(nested_root))
+    combined_dict = {
+        'main': main_dict,
+        'expectedOutput': nested_dict
+    }
+    return json.dumps(combined_dict, indent=4)
+
+def process_single_file(file_path):
+    specifier = get_specifier_from_path(file_path)
+    main_root = parse_xml(file_path)
+    nested_root = extract_nested_xml(main_root)
+    methode_name = get_methode_name(nested_root)
+    if not check_specifier_match(specifier, methode_name):
+        raise ValueError(f"Specifier '{specifier}' does not match <METHODE> Name '{methode_name}'")
+    json_content = convert_to_json(main_root, nested_root)
+    json_file_path = os.path.splitext(file_path)[0] + '.json'
+    with open(json_file_path, 'w') as f:
+        f.write(json_content)
+    return json_file_path
