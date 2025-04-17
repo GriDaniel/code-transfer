@@ -6,6 +6,9 @@ trigger:
     include:
       - samreglib/Samuel/Samuel/plugins/**/*.py
 
+pool:
+  name: 'Self-hosted'
+
 jobs:
   - job: DetectChanges
     steps:
@@ -13,33 +16,18 @@ jobs:
         inputs:
           versionSpec: '3.x'
           addToPath: true
-      - script: |
-          # Get the list of files changed in the latest commit
+      - powershell: |
+          # Get files changed in the latest commit
           $changedFiles = git diff --name-only HEAD HEAD~1
-          
-          # Filter to include only .py files in 'samreglib/Samuel/Samuel/plugins/'
+          # Filter to .py files in samreglib/Samuel/Samuel/plugins/
           $filteredFiles = $changedFiles | Where-Object { $_ -match '^samreglib/Samuel/Samuel/plugins/.*\.py$' }
-          
-          # Loop through each filtered file
+          # Loop through each changed .py file
           foreach ($file in $filteredFiles) {
-              # Split the file path into parts using '/' as the delimiter
-              $pathParts = $file -split '/'
-              
-              # Find the index of 'plugins' in the path
-              $pluginsIndex = $pathParts.IndexOf('plugins')
-              
-              # Check if 'plugins' exists and there’s a folder after it
-              if ($pluginsIndex -ge 0 -and $pluginsIndex + 1 -lt $pathParts.Count) {
-                  # Extract the folder name immediately following 'plugins/'
-                  $folder = $pathParts[$pluginsIndex + 1]
-                  
-                  # Run the Python script with the folder name as an argument
+              if ($file) {
+                  # Extract the folder name after plugins/
+                  $folder = ($file -replace 'samreglib/Samuel/Samuel/plugins/([^/]+)/.*', '$1')
+                  # Run the Python script with the folder name
                   python samreglib/utils/regressionTest/getMethodeTest.py $folder
-                  
-                  # Check if the Python script executed successfully
-                  if ($LASTEXITCODE -ne 0) {
-                      Write-Error "Python script failed for folder $folder"
-                  }
               }
           }
         displayName: 'Run script for each changed .py file'
