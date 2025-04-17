@@ -10,3 +10,72 @@ def process_added_files(files):
 if __name__ == "__main__":
     added_files = sys.argv[1:]
     process_added_files(added_files)
+
+
+
+
+import sys
+import os
+import json
+import xml.etree.ElementTree as ET
+
+def xml_to_dict(element):
+    if len(element) == 0:
+        return element.text
+    result = {}
+    for child in element:
+        child_dict = xml_to_dict(child)
+        if child.tag in result:
+            if not isinstance(result[child.tag], list):
+                result[child.tag] = [result[child.tag]]
+            result[child.tag].append(child_dict)
+        else:
+            result[child.tag] = child_dict
+    return result
+
+def process_file(file_path):
+    try:
+        # Parse the XML file
+        tree = ET.parse(file_path)
+        root = tree.getroot()
+        overall_dict = xml_to_dict(root)
+        
+        # Extract and process the <Data> tag content
+        data_tag = root.find('.//Data')
+        expected_output_dict = None
+        if data_tag is not None and data_tag.text:
+            try:
+                inner_root = ET.fromstring(data_tag.text)
+                expected_output_dict = xml_to_dict(inner_root)
+            except ET.ParseError:
+                print(f"Error parsing inner XML in {file_path}: Invalid XML string in <Data>")
+                expected_output_dict = "Invalid XML in Data tag"
+        
+        # Merge into final dictionary
+        final_dict = overall_dict
+        final_dict["expectedOutput"] = expected_output_dict if expected_output_dict else "No valid Data content found"
+        
+        # Generate JSON file path
+        json_file_path = os.path.splitext(file_path)[0] + '.json'
+        
+        # Write to JSON file
+        with open(json_file_path, 'w') as json_file:
+            json.dump(final_dict, json_file, indent=4)
+        
+        print(f"Generated JSON file: {json_file_path}")
+    except Exception as e:
+        print(f"Error processing {file_path}: {e}")
+
+def process_added_files(files):
+    for file_path in files:
+        if os.path.exists(file_path):
+            process_file(file_path)
+        else:
+            print(f"File not found: {file_path}")
+
+if __name__ == "__main__":
+    added_files = sys.argv[1:]
+    if added_files:
+        process_added_files(added_files)
+    else:
+        print("No files provided to process.")
