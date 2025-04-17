@@ -1,0 +1,14 @@
+import sys
+from xml_processor import process_single_file
+
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        print("Usage: python process_xml.py <xml_file_path> ...")
+        sys.exit(1)
+    for file_path in sys.argv[1:]:
+        try:
+            json_file_path = process_single_file(file_path)
+            print(f"Processed {file_path} to {json_file_path}")
+        except Exception as e:
+            print(f"Error processing {file_path}: {e}")
+            sys.exit(1)
