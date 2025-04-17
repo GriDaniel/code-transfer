@@ -1,0 +1,46 @@
+import xml.etree.ElementTree as ET
+
+def parse_xml_file(file_path):
+    try:
+        # Parse the outer XML file
+        tree = ET.parse(file_path)
+        root = tree.getroot()
+        
+        # Find the <Data> tag
+        data_tag = root.find('.//Data')
+        if data_tag is None:
+            print(f"Error: <Data> tag not found in {file_path}")
+            return None
+        
+        # Extract the inner XML string from <Data>
+        inner_xml_str = data_tag.text.strip()
+        if not inner_xml_str:
+            print(f"Error: <Data> tag is empty in {file_path}")
+            return None
+        
+        try:
+            # Parse the inner XML string
+            inner_root = ET.fromstring(inner_xml_str)
+            
+            # Find the <METHODE> tag in the inner XML
+            methode_tag = inner_root.find('.//METHODE')
+            if methode_tag is None:
+                print(f"Error: <METHODE> tag not found in inner XML of {file_path}")
+                return None
+            
+            # Get the 'Name' attribute from <METHODE>
+            name_value = methode_tag.get('Name')
+            if name_value:
+                return name_value
+            else:
+                print(f"Error: 'Name' attribute not found in <METHODE> tag in {file_path}")
+                return None
+        except ET.ParseError:
+            print(f"Error: Failed to parse inner XML string in {file_path}")
+            return None
+    except ET.ParseError:
+        print(f"Error: Failed to parse XML file: {file_path}")
+        return None
+    except FileNotFoundError:
+        print(f"Error: File not found: {file_path}")
+        return None
