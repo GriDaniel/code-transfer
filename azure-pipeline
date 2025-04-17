@@ -7,9 +7,9 @@ pool:
   name: 'Self-hosted'
 
 steps:
-- script: |
-    added_files=$(git diff --name-only --diff-filter=A HEAD^ HEAD | grep '^samreglib/testData/[^/]\+/[^/]\+\.xml$')
-    if [ -n "$added_files" ]; then
+- powershell: |
+    $added_files = git diff --name-only --diff-filter=A HEAD^ HEAD | Where-Object { $_ -match '^samreglib/testData/[^/]+/[^/]+\.xml$' }
+    if ($added_files) {
       python samreglib/utils/processXML/processXML.py $added_files
-    fi
+    }
   displayName: 'Process Added XML Files'
