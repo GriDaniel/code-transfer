@@ -1,134 +1,30 @@
 trigger:
-  batch: true # Optional: Batch multiple commits into a single run if they occur close together
   paths:
     include:
-      - 'samreglib/testData/*/data.xml' # Be more specific in the trigger path if possible
+      - samreglib/testData/*/*.xml
 
 pool:
-  name: Self-hosted # Your self-hosted agent pool name
+  vmImage: 'ubuntu-latest'
 
 steps:
-- checkout: self # Explicitly check out the code to the agent
+- script: |
+    pip install xmltodict
+  displayName: 'Install dependencies'
 
-- pwsh: |
-    Write-Host "Detecting added XML files matching 'samreglib/testData/*/data.xml'..."
-
-    # Get list of added files matching the specific pattern between this commit and its parent
-    # Uses forward slashes, which Git prefers. Filters directly in the command.
-    $addedFiles = git diff --name-only --diff-filter=A HEAD~1 HEAD -- 'samreglib/testData/*/data.xml'
-
-    if (-not $addedFiles) {
-        Write-Host "No new 'data.xml' files were added in 'samreglib/testData/*/' directories in this commit."
-        exit 0 # Exit the script successfully, pipeline continues but does nothing else here.
-    }
-
-    Write-Host "Found added files to process:"
-    $addedFiles | ForEach-Object { Write-Host "- $_" }
-
-    $pythonScriptPath = "$(System.DefaultWorkingDirectory)/samreglib/utils/processXML/processXML.py"
-
-    if (-not (Test-Path $pythonScriptPath -PathType Leaf)) {
-        Write-Error "ERROR: Python script not found at '$pythonScriptPath'"
-        exit 1
-    }
-
-    $filesToCommit = @() # Keep track of files potentially modified/created by the script
-    $errorOccurred = $false
-
-    foreach ($relPath in $addedFiles) {
-        # Ensure forward slashes for consistency, though git diff usually provides them
-        $filePath = $relPath.Replace('\', '/')
-        Write-Host "Processing '$filePath'..."
-
-        # Execute the python script, passing the relative path
-        # Ensure 'python' or 'python3' is in the agent's PATH
-        python $pythonScriptPath $filePath
-        $exitCode = $LASTEXITCODE
-
-        if ($exitCode -ne 0) {
-            Write-Error "ERROR: Python script failed for '$filePath' with exit code $exitCode."
-            $errorOccurred = $true
-            # Optional: Decide whether to stop processing other files on first error
-            # break
-        } else {
-            Write-Host "Successfully processed '$filePath'."
-            # --- Assumption ---
-            # Assume processXML.py does the following:
-            # 1. Reads the input XML ($filePath)
-            # 2. Creates a corresponding JSON file (e.g., changes extension to .json in the same dir)
-            # 3. *Deletes* the original XML file ($filePath)
-            # If this assumption is wrong, the 'Commit' step needs adjustment.
-
-            # Example: Track the expected JSON output path if needed for a more specific commit
-            # $jsonPath = $filePath -replace '\.xml$', '.json'
-            # if (Test-Path $jsonPath) { $filesToCommit += $jsonPath }
-        }
-    }
-
-    if ($errorOccurred) {
-        Write-Error "One or more XML files failed processing. Check logs."
-        exit 1 # Fail the pipeline step
-    }
-
-    # Store the list of potentially modified/created files for the next step if needed
-    # Write-Host "##vso[task.setvariable variable=ProcessedFiles]$($filesToCommit -join ';')"
-
-  displayName: 'Process Added data.xml Files'
-  workingDirectory: $(System.DefaultWorkingDirectory)
-  name: ProcessXML # Give the step a name for potential dependency reference
-
-- pwsh: |
-    Write-Host "Checking for changes to commit..."
-
-    # Check if there are any staged or unstaged changes
-    $changes = git status --porcelain
-    if (-not $changes) {
-        Write-Host "No changes detected after processing script. Nothing to commit."
-        exit 0
-    }
-
-    Write-Host "Detected changes:"
-    Write-Host $changes
-
-    Write-Host "Configuring Git user..."
-    git config --global user.email "pipeline@example.com" # Use a dedicated pipeline email
-    git config --global user.name "Azure Pipeline"   # Use a clear pipeline name
-
-    Write-Host "Staging ALL detected changes..."
-    # --- Important ---
-    # This 'git add .' assumes your Python script correctly handles file creation/deletion.
-    # Specifically, it should create the JSON and *delete* the original XML.
-    # If XML files remain, they will be staged here.
-    # If you need more control:
-    #   Option A: Modify python script to delete the XML. (Recommended)
-    #   Option B: Explicitly 'git rm' the processed XML files here before 'git add .'.
-    #   Option C: Explicitly 'git add' only the expected JSON files (e.g., git add samreglib/testData/*/data.json).
-    git add .
-
-    $commitMessage = "Pipeline: Convert added XML files to JSON"
-    Write-Host "Committing changes with message: $commitMessage"
-    git commit -m $commitMessage
-
-    # Get the current branch name
-    $branchName = git rev-parse --abbrev-ref HEAD
-    if (-not $branchName) {
-        Write-Error "Could not determine branch name."
-        exit 1
-    }
-    Write-Host "Pushing changes to branch '$branchName'..."
-
-    # Push the commit back to the origin repository
-    # Ensure the build service has push permissions!
-    git push origin HEAD:$branchName
-    $exitCode = $LASTEXITCODE
-
-    if ($exitCode -ne 0) {
-        Write-Error "ERROR: Failed to push changes to origin. Check permissions and repository status."
-        exit 1
-    }
-
-    Write-Host "Changes pushed successfully."
-
-  displayName: 'Commit and Push Results'
-  workingDirectory: $(System.DefaultWorkingDirectory)
-  condition: succeeded('ProcessXML') # Only run this step if the 'ProcessXML' step succeeded
+- script: |
+    changed_xml_files=$(git diff --name-only HEAD HEAD~1 | grep 'samreglib/testData/.*/.*\.xml$')
+    if [ -n "$changed_xml_files" ]; then
+      for file in $changed_xml_files; do
+        python samreglib/utils/processXML/process_xml.py "$file"
+        json_file="${file%.xml}.json"
+        git rm "$file"
+        git add "$json_file"
+      done
+      git config --global user.email "pipeline@azure.com"
+      git config --global user.name "Azure Pipeline"
+      git commit -m "Processed XML files to JSON"
+      git push https://$(System.AccessToken)@dev.azure.com/yourorg/yourproject/_git/yourrepo
+    else
+      echo "No XML files changed."
+    fi
+  displayName: 'Process XML files and commit JSON'
