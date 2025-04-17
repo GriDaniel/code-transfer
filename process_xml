@@ -1,14 +1,12 @@
 import sys
-from xml_processor import process_single_file
 
-if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print("No files to process. Exiting.")
-        sys.exit(0)
-    for file_path in sys.argv[1:]:
-        try:
-            json_file_path = process_single_file(file_path)
-            print(f"Processed {file_path} to {json_file_path}")
-        except Exception as e:
-            print(f"Error processing {file_path}: {e}")
-            sys.exit(1)
+def process_added_files(files):
+    for file_path in files:
+        parts = file_path.split('/')
+        if len(parts) == 4 and parts[0] == 'samreglib' and parts[1] == 'testData':
+            subfolder = parts[2]
+            print(f"Added XML file: {file_path} in folder: {subfolder}")
+
+if __name__ == "__main__":
+    added_files = sys.argv[1:]
+    process_added_files(added_files)
