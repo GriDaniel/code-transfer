@@ -7,6 +7,9 @@ pool:
   name: 'Self-hosted'
 
 steps:
+- checkout: self
+  fetchDepth: 0  # Fetches the full commit history
+
 - powershell: |
     $added_files = git diff --name-only --diff-filter=A HEAD^ HEAD | Where-Object { $_ -match '^samreglib/testData/[^/]+/[^/]+\.xml$' }
     if ($added_files) {
