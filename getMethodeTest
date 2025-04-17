@@ -1,0 +1,27 @@
+trigger:
+  branches:
+    include:
+    - main
+  paths:
+    include:
+    - samreglib/Samuel/Samuel/plugins/**/*.py
+
+jobs:
+- job: DetectChanges
+  steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.x'
+      addToPath: true
+  - script: |
+      # Get files changed in the latest commit
+      changed_files=$(git diff --name-only HEAD HEAD~1)
+      # Filter to .py files in samreglib/Samuel/Samuel/plugins/
+      filtered_files=$(echo "$changed_files" | grep '^samreglib/Samuel/Samuel/plugins/.*\.py$')
+      # For each changed .py file, extract the folder name after plugins/
+      for file in $filtered_files; do
+        folder=$(echo $file | sed 's|samreglib/Samuel/Samuel/plugins/\([^/]*\)/.*|\1|')
+        # Run the Python script with the folder name
+        python samreglib/utils/regressionTest/getMethodeTest.py $folder
+      done
+    displayName: 'Run script for each changed .py file'
