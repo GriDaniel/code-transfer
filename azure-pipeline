@@ -10,6 +10,11 @@ steps:
 - checkout: self
   fetchDepth: 1  # Only the latest commit is fetched
 
+# Install dependencies (if needed)
+- script: |
+    pip install xmltodict
+  displayName: 'Install dependencies'
+
 # Windows: Use PowerShell
 - task: PowerShell@2
   condition: eq(variables['Agent.OS'], 'Windows_NT')
@@ -18,16 +23,20 @@ steps:
     script: |
       $changedXmlFiles = git show --name-only --pretty=format: HEAD | Where-Object { $_ -match 'samreglib/testData/[^/]+/[^/]+\.xml$' }
       if ($changedXmlFiles) {
-          Write-Host "XML files changed in the latest commit:"
-          $changedXmlFiles | ForEach-Object { Write-Host $_ }
-          # Add your processing logic here, e.g.,:
-          # foreach ($file in $changedXmlFiles) {
-          #     python samreglib/utils/processXML/process_xml.py $file
-          # }
+          foreach ($file in $changedXmlFiles) {
+              python samreglib/utils/processXML/process_xml.py $file
+              $jsonFile = [System.IO.Path]::ChangeExtension($file, ".json")
+              git rm $file
+              git add $jsonFile
+          }
+          git config --global user.email "pipeline@azure.com"
+          git config --global user.name "Azure Pipeline"
+          git commit -m "Processed XML files to JSON"
+          git push https://$env:SYSTEM_ACCESSTOKEN@dev.azure.com/yourorg/yourproject/_git/yourrepo
       } else {
           Write-Host "No XML files changed in the latest commit."
       }
-  displayName: 'Check Latest XML Files (Windows)'
+  displayName: 'Process XML files and commit JSON (Windows)'
 
 # Linux: Use Bash
 - task: Bash@3
@@ -37,13 +46,17 @@ steps:
     script: |
       changed_xml_files=$(git show --name-only --pretty=format: HEAD | grep -E 'samreglib/testData/[^/]+/[^/]+\.xml$')
       if [ -n "$changed_xml_files" ]; then
-        echo "XML files changed in the latest commit:"
-        echo "$changed_xml_files"
-        # Add your processing logic here, e.g.,:
-        # for file in $changed_xml_files; do
-        #   python samreglib/utils/processXML/process_xml.py "$file"
-        # done
+        for file in $changed_xml_files; do
+          python samreglib/utils/processXML/process_xml.py "$file"
+          json_file="${file%.xml}.json"
+          git rm "$file"
+          git add "$json_file"
+        done
+        git config --global user.email "pipeline@azure.com"
+        git config --global user.name "Azure Pipeline"
+        git commit -m "Processed XML files to JSON"
+        git push https://$(System.AccessToken)@dev.azure.com/yourorg/yourproject/_git/yourrepo
       else
         echo "No XML files changed in the latest commit."
       fi
-  displayName: 'Check Latest XML Files (Linux)'
+  displayName: 'Process XML files and commit JSON (Linux)'
