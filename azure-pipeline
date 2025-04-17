@@ -9,16 +9,30 @@ pool:
 steps:
 - checkout: self
   fetchDepth: 0
+  ref: 'refs/heads/main'  # Replace with your branch name if different
 
 - powershell: |
+    git checkout main  # Replace with your branch name
+    Write-Host "Current directory: $(Get-Location)"
+    Write-Host "Listing files in samreglib/utils/processXML:"
+    dir samreglib/utils/processXML
     $added_files = git diff --name-only --diff-filter=A HEAD^ HEAD | Where-Object { $_ -match '^samreglib/testData/[^/]+/[^/]+\.xml$' }
     if ($added_files) {
-      Write-Host "Processing added XML files: $added_files"
-      python samreglib/utils/processXML/processXML.py $added_files
+      Write-Host "Added XML files: $added_files"
+      Write-Host "Running processXML.py with files: $added_files"
+      try {
+        python samreglib/utils/processXML/processXML.py $added_files
+        Write-Host "Python script completed."
+      } catch {
+        Write-Host "Error running Python script: $_"
+      }
+      Write-Host "Listing files after Python script:"
+      dir $(Split-Path $added_files[0] -Parent)
       foreach ($file in $added_files) {
-        git rm $file
         $json_file = $file -replace '\.xml$', '.json'
+        Write-Host "Checking for JSON file: $json_file"
         if (Test-Path $json_file) {
+          git rm $file
           git add $json_file
           Write-Host "Added JSON file: $json_file"
         } else {
