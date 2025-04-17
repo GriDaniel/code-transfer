@@ -7,56 +7,9 @@ pool:
   name: 'Self-hosted'
 
 steps:
-- checkout: self
-  fetchDepth: 1  # Only the latest commit is fetched
-
-# Install dependencies (if needed)
 - script: |
-    pip install xmltodict
-  displayName: 'Install dependencies'
-
-# Windows: Use PowerShell
-- task: PowerShell@2
-  condition: eq(variables['Agent.OS'], 'Windows_NT')
-  inputs:
-    targetType: 'inline'
-    script: |
-      $changedXmlFiles = git show --name-only --pretty=format: HEAD | Where-Object { $_ -match 'samreglib/testData/[^/]+/[^/]+\.xml$' }
-      if ($changedXmlFiles) {
-          foreach ($file in $changedXmlFiles) {
-              python samreglib/utils/processXML/process_xml.py $file
-              $jsonFile = [System.IO.Path]::ChangeExtension($file, ".json")
-              git rm $file
-              git add $jsonFile
-          }
-          git config --global user.email "pipeline@azure.com"
-          git config --global user.name "Azure Pipeline"
-          git commit -m "Processed XML files to JSON"
-          git push https://$env:SYSTEM_ACCESSTOKEN@dev.azure.com/yourorg/yourproject/_git/yourrepo
-      } else {
-          Write-Host "No XML files changed in the latest commit."
-      }
-  displayName: 'Process XML files and commit JSON (Windows)'
-
-# Linux: Use Bash
-- task: Bash@3
-  condition: eq(variables['Agent.OS'], 'Linux')
-  inputs:
-    targetType: 'inline'
-    script: |
-      changed_xml_files=$(git show --name-only --pretty=format: HEAD | grep -E 'samreglib/testData/[^/]+/[^/]+\.xml$')
-      if [ -n "$changed_xml_files" ]; then
-        for file in $changed_xml_files; do
-          python samreglib/utils/processXML/process_xml.py "$file"
-          json_file="${file%.xml}.json"
-          git rm "$file"
-          git add "$json_file"
-        done
-        git config --global user.email "pipeline@azure.com"
-        git config --global user.name "Azure Pipeline"
-        git commit -m "Processed XML files to JSON"
-        git push https://$(System.AccessToken)@dev.azure.com/yourorg/yourproject/_git/yourrepo
-      else
-        echo "No XML files changed in the latest commit."
-      fi
-  displayName: 'Process XML files and commit JSON (Linux)'
+    added_files=$(git diff --name-only --diff-filter=A HEAD^ HEAD | grep '^samreglib/testData/[^/]\+/[^/]\+\.xml$')
+    if [ -n "$added_files" ]; then
+      python samreglib/utils/processXML/processXML.py $added_files
+    fi
+  displayName: 'Process Added XML Files'
