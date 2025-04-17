@@ -16,21 +16,22 @@ steps:
   inputs:
     targetType: 'inline'
     script: |
-      $changedXmlFiles = git show --name-only --pretty=format: HEAD | Where-Object { $_ -match 'samreglib/testData/[^/]+/[^/]+\.xml$' }
-      if ($changedXmlFiles) {
-          foreach ($file in $changedXmlFiles) {
-              python samreglib/utils/processXML/process_xml.py $file
-              $jsonFile = [System.IO.Path]::ChangeExtension($file, ".json")
-              git rm $file
-              git add $jsonFile
-          }
-          git config --global user.email "pipeline@azure.com"
-          git config --global user.name "Azure Pipeline"
-          git commit -m "Processed XML files to JSON"
-          git push https://$env:SYSTEM_ACCESSTOKEN@dev.azure.com/yourorg/yourproject/_git/yourrepo
-      } else {
-          Write-Host "No XML files changed."
-      }
+          changed_xml_files=$(git show --name-only --pretty=format: HEAD | grep -E 'samreglib/testData/[^/]+/[^/]+\.xml$')
+    echo "Changed XML files: $changed_xml_files"
+    if [ -n "$changed_xml_files" ]; then
+      for file in $changed_xml_files; do
+        python samreglib/utils/processXML/process_xml.py "$file"
+        json_file="${file%.xml}.json"
+        git rm "$file"
+        git add "$json_file"
+      done
+      git config --global user.email "pipeline@azure.com"
+      git config --global user.name "Azure Pipeline"
+      git commit -m "Processed XML files to JSON"
+      git push https://$(System.AccessToken)@dev.azure.com/yourorg/yourproject/_git/yourrepo
+    else
+      echo "No XML files changed. Skipping processing."
+    fi
   displayName: 'Process XML files (Windows)'
 
 # Linux: Use Bash
