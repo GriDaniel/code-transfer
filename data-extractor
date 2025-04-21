@@ -14,10 +14,10 @@ def extract_attributes(data_dict):
     """
     def find_keys(data, target_keys):
         """
-        Recursively search for target keys in a nested dictionary.
+        Recursively search for target keys in a nested dictionary or list.
         
         Args:
-            data: Dictionary or value to search.
+            data: Dictionary, list, or value to search.
             target_keys: Set of keys to find (e.g., {'SLOPE', 'RESULT'}).
         
         Returns:
@@ -27,25 +27,48 @@ def extract_attributes(data_dict):
         if isinstance(data, dict):
             for key, value in data.items():
                 if key in target_keys:
+                    # Store the value (could be dict or list)
                     found[key] = value
                 else:
-                    # Recursively search in nested dictionaries
+                    # Recursively search nested dictionaries
                     nested_found = find_keys(value, target_keys)
                     found.update(nested_found)
         elif isinstance(data, list):
-            # Search through lists as well
+            # Search through lists
             for item in data:
                 nested_found = find_keys(item, target_keys)
                 found.update(nested_found)
         return found
 
+    def extract_dict(data):
+        """
+        Extract a dictionary from data, handling lists or non-dict cases.
+        
+        Args:
+            data: Dictionary, list, or other type.
+        
+        Returns:
+            dict: Extracted dictionary or empty dict if not a dictionary.
+        """
+        if isinstance(data, dict):
+            return data
+        elif isinstance(data, list) and data:
+            # If a list, take the first dictionary or merge all dictionaries
+            for item in data:
+                if isinstance(item, dict):
+                    return item  # Return first dictionary found
+            return {}  # No dictionaries found
+        return {}  # Not a dict or list, or empty list
+
     extracted_output = data_dict.get("extractedOutput", {})
     target_keys = {"SLOPE", "RESULT"}
     found_keys = find_keys(extracted_output, target_keys)
     
-    # Extract attributes from SLOPE and RESULT, defaulting to empty dicts if not found
-    slope = found_keys.get("SLOPE", {})
-    result = found_keys.get("RESULT", {})
+    # Extract dictionaries from SLOPE and RESULT
+    slope = extract_dict(found_keys.get("SLOPE", {}))
+    result = extract_dict(found_keys.get("RESULT", {}))
+    
+    # Combine attributes, ensuring both are dictionaries
     return {**slope, **result}
 
 def get_data_reference(json_files, plugin):
