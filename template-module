@@ -1,0 +1,52 @@
+# template_module.py
+import json
+
+# Define comparison functions (unchanged from your original code)
+def percent_difference(val1, val2):
+    """Calculate the percent difference between two values."""
+    # Use val1 as reference; handle division by zero in real code if needed
+    return abs((val1 - val2) / val1) * 100
+
+def absolute_difference(val1, val2):
+    """Calculate the absolute difference between two values."""
+    return abs(val1 - val2)
+
+def angle_difference(val1, val2):
+    """Calculate the smallest difference between two angles (0-360 degrees)."""
+    diff = abs(val1 - val2) % 360
+    return min(diff, 360 - diff)
+
+# Mapping from comparison type strings to function objects
+comparison_functions = {
+    "percent": percent_difference,
+    "absolute": absolute_difference,
+    "angle": angle_difference
+}
+
+# Function to load templates from JSON file
+def load_templates(json_file):
+    """Load template configurations from a JSON file and map to functions."""
+    try:
+        with open(json_file, 'r') as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Template file '{json_file}' not found.")
+    except json.JSONDecodeError:
+        raise ValueError(f"Invalid JSON format in '{json_file}'.")
+    
+    templates = {}
+    for plugin, attrs in data.items():
+        templates[plugin] = {}
+        for attr, comp_type in attrs.items():
+            if comp_type in comparison_functions:
+                templates[plugin][attr] = comparison_functions[comp_type]
+            else:
+                raise ValueError(f"Unknown comparison type '{comp_type}' for attribute '{attr}' in plugin '{plugin}'")
+    return templates
+
+# Load templates at module level
+templates = load_templates('templates.json')
+
+def get_template(plugin):
+    """Return the template dictionary for the given plugin, or None if not found."""
+    return templates.get(plugin, None)
