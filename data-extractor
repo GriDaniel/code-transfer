@@ -40,25 +40,29 @@ def extract_attributes(data_dict):
                 found.update(nested_found)
         return found
 
-   def extract_dict(data):
-        """
-        Extract a dictionary from data, handling lists or non-dict cases.
-        Excludes '#text' keys.
-        
-        Args:
-            data: Dictionary, list, or other type.
-        
-        Returns:
-            dict: Extracted dictionary or empty dict if not a dictionary.
-        """
-        if isinstance(data, dict):
-            return {k: v for k, v in data.items() if k != "#text"}  # Filter '#text'
-        elif isinstance(data, list) and data:
-            for item in data:
-                if isinstance(item, dict):
-                    return {k: v for k, v in item.items() if k != "#text"}  # Filter '#text'
-            return {}
-        return {}
+  def extract_dict(data):
+     """
+     Extract dictionaries from data, handling lists or non-dict cases.
+     Excludes '#text' keys.
+     
+     Args:
+         data: Dictionary, list, or other type.
+     
+     Returns:
+         list: List of extracted dictionaries.
+     """
+     result = []
+     if isinstance(data, dict):
+         filtered = {k: v for k, v in data.items() if k != "#text"}  # Filter '#text'
+         if filtered:
+             result.append(filtered)
+     elif isinstance(data, list):
+         for item in data:
+             if isinstance(item, dict):
+                 filtered = {k: v for k, v in item.items() if k != "#text"}  # Filter '#text'
+                 if filtered:
+                     result.append(filtered)
+     return result
 
     extracted_output = data_dict.get("extractedOutput", {})
     target_keys = {"SLOPE", "RESULT"}
