@@ -1,0 +1,63 @@
+import json
+import os
+import xmltodict
+
+def extract_attributes(data_dict):
+    """
+    Extract attributes from 'SLOPE' and 'RESULT' within 'extractedOutput'.
+    
+    Args:
+        data_dict (dict): Dictionary from JSON or XML data.
+    
+    Returns:
+        dict: Combined attributes from 'SLOPE' and 'RESULT'.
+    """
+    extracted_output = data_dict.get("extractedOutput", {})
+    slope = extracted_output.get("SLOPE", {})
+    result = extracted_output.get("RESULT", {})
+    return {**slope, **result}
+
+def get_data_reference(json_files, plugin):
+    """
+    Read JSON files from samreglib/testData/<plugin>/<file_path> and extract attributes.
+    
+    Args:
+        json_files (list): List of file paths relative to the plugin directory.
+        plugin (str): Name of the plugin to determine the directory.
+    
+    Returns:
+        list: List of dictionaries with attributes per file.
+    
+    Raises:
+        FileNotFoundError: If a file is not found at the constructed path.
+        JSONDecodeError: If a file contains invalid JSON.
+    """
+    base_dir = os.path.join('samreglib', 'testData', plugin)
+    ref_data = []
+    for file_path in json_files:
+        full_path = os.path.join(base_dir, file_path)
+        try:
+            with open(full_path, 'r') as f:
+                data = json.load(f)
+            attributes = extract_attributes(data)
+            ref_data.append(attributes)
+        except FileNotFoundError:
+            print(f"File not found: {full_path}")
+            raise
+        except json.JSONDecodeError:
+            print(f"Invalid JSON in file: {full_path}")
+            raise
+    return ref_data
+
+def get_data_output(xml_string):
+    """
+    Parse an XML string and extract attributes.
+    
+    Args:
+        xml_string (str): Single XML string to process.
+    
+    Returns:
+        dict: Attributes extracted from the XML string.
+    """
+    data = xmltodict.parse(xml_string)
+    return extract_attributes(data)
