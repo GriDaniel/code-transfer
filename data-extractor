@@ -40,9 +40,10 @@ def extract_attributes(data_dict):
                 found.update(nested_found)
         return found
 
-    def extract_dict(data):
+   def extract_dict(data):
         """
         Extract a dictionary from data, handling lists or non-dict cases.
+        Excludes '#text' keys.
         
         Args:
             data: Dictionary, list, or other type.
@@ -51,14 +52,13 @@ def extract_attributes(data_dict):
             dict: Extracted dictionary or empty dict if not a dictionary.
         """
         if isinstance(data, dict):
-            return data
+            return {k: v for k, v in data.items() if k != "#text"}  # Filter '#text'
         elif isinstance(data, list) and data:
-            # If a list, take the first dictionary or merge all dictionaries
             for item in data:
                 if isinstance(item, dict):
-                    return item  # Return first dictionary found
-            return {}  # No dictionaries found
-        return {}  # Not a dict or list, or empty list
+                    return {k: v for k, v in item.items() if k != "#text"}  # Filter '#text'
+            return {}
+        return {}
 
     extracted_output = data_dict.get("extractedOutput", {})
     target_keys = {"SLOPE", "RESULT"}
