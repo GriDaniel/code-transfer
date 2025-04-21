@@ -4,7 +4,7 @@ import xmltodict
 
 def extract_attributes(data_dict):
     """
-    Extract attributes from 'SLOPE' and 'RESULT' within 'extractedOutput'.
+    Extract attributes from 'SLOPE' and 'RESULT' found anywhere within 'extractedOutput'.
     
     Args:
         data_dict (dict): Dictionary from JSON or XML data.
@@ -12,9 +12,40 @@ def extract_attributes(data_dict):
     Returns:
         dict: Combined attributes from 'SLOPE' and 'RESULT'.
     """
+    def find_keys(data, target_keys):
+        """
+        Recursively search for target keys in a nested dictionary.
+        
+        Args:
+            data: Dictionary or value to search.
+            target_keys: Set of keys to find (e.g., {'SLOPE', 'RESULT'}).
+        
+        Returns:
+            dict: Dictionary of found keys and their values.
+        """
+        found = {}
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if key in target_keys:
+                    found[key] = value
+                else:
+                    # Recursively search in nested dictionaries
+                    nested_found = find_keys(value, target_keys)
+                    found.update(nested_found)
+        elif isinstance(data, list):
+            # Search through lists as well
+            for item in data:
+                nested_found = find_keys(item, target_keys)
+                found.update(nested_found)
+        return found
+
     extracted_output = data_dict.get("extractedOutput", {})
-    slope = extracted_output.get("SLOPE", {})
-    result = extracted_output.get("RESULT", {})
+    target_keys = {"SLOPE", "RESULT"}
+    found_keys = find_keys(extracted_output, target_keys)
+    
+    # Extract attributes from SLOPE and RESULT, defaulting to empty dicts if not found
+    slope = found_keys.get("SLOPE", {})
+    result = found_keys.get("RESULT", {})
     return {**slope, **result}
 
 def get_data_reference(json_files, plugin):
