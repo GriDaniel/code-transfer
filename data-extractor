@@ -103,15 +103,23 @@ def get_data_reference(json_files, plugin):
             raise
     return ref_data
 
-def get_data_output(xml_string):
+def get_data_output(xml_strings):
     """
-    Parse an XML string and extract attributes.
+    Parse a list of XML strings and extract attributes from each.
     
     Args:
-        xml_string (str): Single XML string to process.
+        xml_strings (list): List of XML strings to process.
     
     Returns:
-        dict: Attributes extracted from the XML string.
+        list: List of dictionaries with attributes per XML string.
     """
-    data = xmltodict.parse(xml_string)
-    return extract_attributes(data)
+    out_data = []
+    for xml_string in xml_strings:
+        try:
+            data = xmltodict.parse(xml_string)
+            attributes = extract_attributes(data)
+            out_data.append(attributes)
+        except xmltodict.expat.ExpatError:
+            print(f"Invalid XML string: {xml_string[:50]}...")  # Show start of string
+            raise
+    return out_data
