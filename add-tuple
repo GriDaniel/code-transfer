@@ -1,0 +1,46 @@
+from template_module import get_template
+
+def compare_tuples_to_template(tuple1, tuple2, plugin='METHODE'):
+    # Load template (attribute -> comparison function)
+    template_funcs = get_template(plugin)
+    if not template_funcs:
+        raise ValueError(f"No template found for plugin '{plugin}'")
+    
+    # Initialize result template
+    result_template = {key: None for key in template_funcs}
+    
+    # Combine dictionaries: list of dicts + single dict
+    dicts1 = tuple1[0] + [tuple1[1]]
+    dicts2 = tuple2[0] + [tuple2[1]]
+    
+    # Check structure
+    if len(dicts1) != len(dicts2):
+        raise ValueError("Tuples have different structures")
+    
+    # Compare dictionaries
+    for d1, d2 in zip(dicts1, dicts2):
+        for attr in template_funcs:
+            if attr in d1 and attr in d2:
+                # Pass values to the comparison function
+                result_template[attr] = template_funcs[attr](d1[attr], d2[attr])
+    
+    return result_template
+
+# Example usage
+tuple1 = (
+    [{'PosX': '3', 'PosY': '4'}, {'START': '3'}],
+    {'other': 'value1'}
+)
+tuple2 = (
+    [{'PosX': '32.5', 'PosY': '42'}, {'START': '33'}],
+    {'other': 'value2'}
+)
+
+# Compare tuples
+result = compare_tuples_to_template(tuple1, tuple2)
+
+# Print results
+print("Comparison Results:")
+for key, value in result.items():
+    if value is not None:
+        print(f"{key}: {value}")
