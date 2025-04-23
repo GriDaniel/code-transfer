@@ -44,3 +44,7 @@ print("Comparison Results:")
 for key, value in result.items():
     if value is not None:
         print(f"{key}: {value}")
+
+
+
+pattern = r'<METHODE\s*[^>]*>[^<]*(?:<(?!/METHODE\s*>)[^<]*)*</METHODE\s*>'
